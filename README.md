@@ -3,4 +3,4 @@
 返回切割后的图片和相对于原图的坐标
 
 
-![image](crop_{crop}}crop.png)
+![image]([crop_{crop}}crop.png](https://github.com/leon-tly/cuda-sahi-crop-image/blob/main/crop.png)https://github.com/leon-tly/cuda-sahi-crop-image/blob/main/crop.png)
