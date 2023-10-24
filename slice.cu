@@ -59,7 +59,7 @@ void slice(const uint8_t* data,
     int output_img_size = 3 * slice_width * slice_height;
     uint8_t* output_imgs_gpu;
     cudaMalloc((void**)&output_imgs_gpu, output_img_size * slice_num * sizeof(uint8_t));
-
+    cudaMemset(output_imgs_gpu, 114, output_img_size * slice_num * sizeof(uint8_t));
     dim3 threads(32, 32);
     dim3 blocks((width + 31) / 32, (height + 31) / 32);
 
