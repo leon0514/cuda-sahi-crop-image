@@ -83,11 +83,5 @@ void slice(const uint8_t* data,
             cudaMemcpy(output_img_data, output_imgs_gpu+image_id*output_img_size, output_img_size*sizeof(uint8_t), cudaMemcpyDeviceToHost);
         }
     }
-    // for (int i = 0; i < slice_num; i++)
-    // {
-    //     slice_images[i] = cv::Mat(slice_height, slice_width, CV_8UC3);
-    //     uint8_t* output_img_data = slice_images[i].ptr<uint8_t>();
-    //     cudaMemcpy(output_img_data, output_imgs_gpu + i * output_img_size, output_img_size * sizeof(uint8_t), cudaMemcpyDeviceToHost);
-    // }
     cudaFree(output_imgs_gpu);
 }
