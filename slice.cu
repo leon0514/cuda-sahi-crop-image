@@ -1,4 +1,4 @@
-#include "cppsahi/slice.h"
+#include "slice.h"
 
 __global__ void slice_kernel(const uint8_t*  image,
                              uint8_t*  outs,
