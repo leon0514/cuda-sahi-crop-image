@@ -1,14 +1,15 @@
 #include "slice.h"
 
-__global__ void slice_kernel(const uint8_t*  image,
-                             uint8_t*  outs,
-                             const int width,
-                             const int height,
-                             const int slice_width,
-                             const int slice_height,
-                             const int slice_num_h,
-                             const int slice_num_v,
-                             const int overlap_pixel)
+__global__ void slice_kernel(
+  const uint8_t*  image,
+  uint8_t*  outs,
+  const int width,
+  const int height,
+  const int slice_width,
+  const int slice_height,
+  const int slice_num_h,
+  const int slice_num_v,
+  const int overlap_pixel)
 {
     const int out_size = 3 * slice_width * slice_height;
     int dx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -43,14 +44,15 @@ __global__ void slice_kernel(const uint8_t*  image,
     }
 }
 
-void slice(const uint8_t* data,
-            std::vector<cv::Mat>& slice_images, 
-            std::vector<cv::Rect_<float>>& crop_size,
-            const int width,
-            const int height,
-            const int slice_num_h, 
-            const int slice_num_v, 
-            const float overlap_ratio)
+void slice(
+  const uint8_t* data,
+  std::vector<cv::Mat>& slice_images, 
+  std::vector<cv::Rect_<float>>& crop_size,
+  const int width,
+  const int height,
+  const int slice_num_h, 
+  const int slice_num_v, 
+  const float overlap_ratio)
 {
     int slice_num = slice_num_h * slice_num_v;
     const int overlap_pixel = std::max(width, height) * overlap_ratio;
