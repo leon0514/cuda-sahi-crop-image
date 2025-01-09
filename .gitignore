@@ -12,6 +12,7 @@ workspace/*.jpg
 *.engine
 objs
 .idea
+.vscode
 
 # Precompiled Headers
 *.gch

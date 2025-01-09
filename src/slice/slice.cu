@@ -27,7 +27,7 @@ static __global__ void slice_kernel(
 
 
     // 定义共享内存，存储切片范围
-    __shared__ int slice_range_h[32]; // 假设一个线程块最多处理 32 个切片（可以根据实际情况调整）
+    __shared__ int slice_range_h[32]; // 假设一个线程块最多处理 16 个切片（可以根据实际情况调整）
     __shared__ int slice_range_v[32]; 
 
     // 计算切片的起始和结束位置，并存储在共享内存中
