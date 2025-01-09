@@ -154,7 +154,7 @@ std::vector<SlicedImageData> SliceImage::slice(
             slicedData[index].w = slice_width;
             slicedData[index].h = slice_height;
             uint8_t* output_img_data = slicedData[index].image.ptr<uint8_t>();
-            cudaMemcpyAsync(output_img_data, output_device+index*output_img_size, output_img_size*sizeof(uint8_t), cudaMemcpyDeviceToHost);
+            cudaMemcpyAsync(output_img_data, output_device+index*output_img_size, output_img_size*sizeof(uint8_t), cudaMemcpyDeviceToHost, stream_);
         }
     }
     checkRuntime(cudaStreamSynchronize(stream_));
