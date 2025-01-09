@@ -23,9 +23,10 @@ int main()
 
     cv::Mat image = cv::imread("wallhaven-l8vp7y.jpg");
 
-    int slice_num_h = 4;
-    int slice_num_v = 4;
-    auto results = instance.slice(tensor::cvimg(image), slice_num_h, slice_num_v, 0.1);
+    auto results = instance.slice(tensor::cvimg(image), 640, 320, 0.1, 0.1);
+
+    int slice_num_h = slice::calculateNumCuts(1920, 640, 0.1);
+    int slice_num_v = slice::calculateNumCuts(1080, 320, 0.1);
 
     for (int i = 0; i < slice_num_h; i++)
     {

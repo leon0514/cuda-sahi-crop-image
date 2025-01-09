@@ -17,6 +17,8 @@ struct SlicedImageData{
     float h;
 };
 
+int calculateNumCuts(int dimension, int subDimension, float overlapRatio);
+
 class SliceImage{
 private:
     tensor::Memory<unsigned char> input_image_;
@@ -24,11 +26,11 @@ private:
 public:
     std::vector<SlicedImageData> slice(
         const tensor::Image& image, 
-        const int slice_num_h, 
-        const int slice_num_v,
-        const float overlap_ratio,
+        const int slice_width,
+        const int slice_height, 
+        const float overlap_width_ratio,
+        const float overlap_height_ratio,
         void* stream=nullptr);
-
 };
 
 
