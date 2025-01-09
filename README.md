@@ -32,7 +32,7 @@ if (threadIdx.y < slice_num_v) {
 }
 __syncthreads();
 ```
-重叠面积按照最短边乘重叠百分比计算。
+**重叠面积按照最短边乘重叠百分比计算。**
 ```C++
 int width = image.width;
 int height = image.height;
