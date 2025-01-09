@@ -92,10 +92,10 @@ std::vector<SlicedImageData> SliceImage::slice(
     size_t output_img_size = 3 * slice_width * slice_height;
 
     input_image_.gpu(size_image);
-    input_image_.cpu(size_image);
+    // input_image_.cpu(size_image);
 
     output_images_.gpu(slice_num * output_img_size);
-    output_images_.cpu(slice_num * output_img_size);
+    // output_images_.cpu(slice_num * output_img_size);
 
     checkRuntime(cudaMemcpyAsync(input_image_.gpu(), image.bgrptr, size_image, cudaMemcpyHostToDevice, stream_));
     checkRuntime(cudaStreamSynchronize(stream_));

@@ -8,6 +8,7 @@
 *.obj
 
 workspace/pro
+workspace/*.jpg
 *.engine
 objs
 .idea
@@ -35,3 +36,4 @@ objs
 *.exe
 *.out
 *.app
+
