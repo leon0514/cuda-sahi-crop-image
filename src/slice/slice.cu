@@ -1,6 +1,6 @@
 #include "slice/slice.hpp"
 #include "common/check.hpp"
-
+#include <cmath>
 
 static __global__ void slice_kernel(
   const uint8_t*  image,
@@ -108,9 +108,122 @@ namespace slice
 {
 
 int calculateNumCuts(int dimension, int subDimension, float overlapRatio) {
-    // 使用公式计算切割数量
-    int numCuts = std::ceil(static_cast<float>(dimension - subDimension) / (subDimension * (1 - overlapRatio))) + 1;
-    return numCuts;
+    float step = subDimension * (1 - overlapRatio);
+    float cuts = static_cast<float>(dimension - subDimension) / step;
+    if (fabs(cuts - round(cuts)) < 0.0001) {
+        cuts = round(cuts);
+    }
+    int numCuts = static_cast<int>(std::ceil(cuts));
+    return numCuts + 1;
+}
+
+static int calc_resolution_factor(int resolution)
+{
+    int expo = 0;
+    while(pow(2, expo) < resolution) expo++;
+    return expo - 1;
+} 
+
+static std::string calc_aspect_ratio_orientation(int width, int height)
+{
+    if (width < height)
+        return  "vertical";
+    else if(width > height)
+        return "horizontal";
+    else
+        return "square";
+}
+
+static std::tuple<int, int, float, float> calc_ratio_and_slice(const std::string& orientation, int slide=1, float ratio=0.1)
+{
+    int slice_row, slice_col;
+    float overlap_height_ratio, overlap_width_ratio;
+    if (orientation == "vertical")
+    {
+        slice_row = slide;
+        slice_col = slide * 2;
+        overlap_height_ratio = ratio;
+        overlap_width_ratio = ratio;
+    }
+    else if (orientation == "horizontal")
+    {
+        slice_row = slide * 2;
+        slice_col = slide;
+        overlap_height_ratio = ratio;
+        overlap_width_ratio = ratio;
+    }
+    else if (orientation == "square")
+    {
+        slice_row = slide;
+        slice_col = slide;
+        overlap_height_ratio = ratio;
+        overlap_width_ratio = ratio;
+    }
+    return std::make_tuple(slice_row, slice_col, overlap_height_ratio, overlap_width_ratio);
+}
+
+static std::tuple<int, int, float, float> calc_slice_and_overlap_params(
+    const std::string& resolution, int width, int height, std::string orientation)
+{
+    int split_row, split_col;
+    float overlap_height_ratio, overlap_width_ratio;
+    if (resolution == "medium")
+        std::tie(split_row, split_col, overlap_height_ratio, overlap_width_ratio) = calc_ratio_and_slice(
+            orientation, 1, 0.8
+        );
+
+    else if (resolution == "high")
+        std::tie(split_row, split_col, overlap_height_ratio, overlap_width_ratio) = calc_ratio_and_slice(
+            orientation, 2, 0.4
+        );
+
+    else if (resolution == "ultra-high")
+        std::tie(split_row, split_col, overlap_height_ratio, overlap_width_ratio) = calc_ratio_and_slice(
+            orientation, 4, 0.4
+        );
+    else
+    {
+        split_col = 1;
+        split_row = 1;
+        overlap_width_ratio = 1;
+        overlap_height_ratio = 1;
+    }
+    int slice_height = height / split_col;
+    int slice_width = width / split_row;
+    return std::make_tuple(slice_width, slice_height, overlap_height_ratio, overlap_width_ratio);
+}
+
+static std::tuple<int, int, float, float> get_resolution_selector(const std::string& resolution, int width, int height)
+{
+    std::string orientation = calc_aspect_ratio_orientation(width, height);
+    return calc_slice_and_overlap_params(resolution, width, height, orientation);
+
+}
+
+static std::tuple<int, int, float, float> get_auto_slice_params(int width, int height)
+{
+    int resolution = height * width;
+    int factor = calc_resolution_factor(resolution);
+    if (factor <= 18)
+        return get_resolution_selector("low", width, height);
+    else if (18 <= factor && factor < 21)
+        return get_resolution_selector("medium", width, height);
+    else if (21 <= factor && factor < 24)
+        return get_resolution_selector("high", width, height);
+    else
+        return get_resolution_selector("ultra-high", width, height);
+}
+
+std::vector<SlicedImageData> SliceImage::autoSlice(
+        const tensor::Image& image,
+        void* stream)
+{
+    int slice_width;
+    int slice_height;
+    float overlap_width_ratio;
+    float overlap_height_ratio;
+    std::tie(slice_width, slice_height, overlap_width_ratio, overlap_height_ratio) = get_auto_slice_params(image.width, image.height);
+    return slice(image, slice_width, slice_height, overlap_width_ratio, overlap_height_ratio, stream);
 }
 
 std::vector<SlicedImageData> SliceImage::slice(
@@ -128,9 +241,7 @@ std::vector<SlicedImageData> SliceImage::slice(
 
     int slice_num_h = calculateNumCuts(width, slice_width, overlap_width_ratio);
     int slice_num_v = calculateNumCuts(height, slice_height, overlap_height_ratio);
-
-    printf("%d,%d\n",slice_num_h,slice_num_v);
-
+    std::cout << "slice_num_h : " << slice_num_h << " slice_num_v : " << slice_num_v << std::endl;
     int slice_num            = slice_num_h * slice_num_v;
     int overlap_width_pixel  = slice_width  * overlap_width_ratio;
     int overlap_height_pixel = slice_height * overlap_height_ratio;

@@ -17,7 +17,45 @@ void addTransparency(cv::Mat& image, const cv::Rect& rect, const cv::Scalar& col
     cv::addWeighted(overlay, alpha, image, 1.0 - alpha, 0, image); // 合成带透明度的矩形
 }
 
-int main()
+void test_auto()
+{
+    slice::SliceImage instance;
+
+    cv::Mat image = cv::imread("wallhaven-l8vp7y.jpg");
+    auto results = instance.autoSlice(tensor::cvimg(image));
+
+    for (const auto& res : results)
+    {
+        std::cout << res.x << " " << res.y << std::endl;
+        std::cout << res.w << " " << res.h << std::endl;
+        int x = (int)(res.x);
+        int y = (int)(res.y);
+        int w = (int)(res.w);
+        int h = (int)(res.h);
+
+        // 生成一个随机颜色用于矩形框填充
+        cv::Scalar randomColor = generateRandomColor();
+        cv::Scalar borderColor = randomColor;
+
+        // 生成矩形的坐标
+        cv::Rect rect(x, y, w, h);
+
+        // 给每个矩形添加透明填充
+        addTransparency(image, rect, randomColor, 0.3); // alpha值设为0.3来模拟透明度
+
+        // 在图像上绘制矩形框，增加更厚的边框
+        int lineThickness = 6; // 增加边框厚度，使框更加突出
+        cv::rectangle(image, rect, borderColor, lineThickness);
+
+        // 保存带框的图片
+        std::string image_name = std::to_string(x) + std::to_string(y) + ".jpg";
+        cv::imwrite(image_name, image);
+        
+    }
+    cv::imwrite("rect.jpg", image);
+}
+
+void test()
 {
     slice::SliceImage instance;
 
@@ -65,5 +103,9 @@ int main()
         
     }
     cv::imwrite("rect.jpg", image);
-    return 0;
+}
+
+int main()
+{
+    test_auto();
 }

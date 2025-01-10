@@ -31,6 +31,10 @@ public:
         const float overlap_width_ratio,
         const float overlap_height_ratio,
         void* stream=nullptr);
+    
+    std::vector<SlicedImageData> autoSlice(
+        const tensor::Image& image, 
+        void* stream=nullptr);
 };
 
 
