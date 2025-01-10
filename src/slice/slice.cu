@@ -109,6 +109,10 @@ namespace slice
 
 int calculateNumCuts(int dimension, int subDimension, float overlapRatio) {
     float step = subDimension * (1 - overlapRatio);
+    if (step == 0)
+    {
+        return 1;
+    }
     float cuts = static_cast<float>(dimension - subDimension) / step;
     // 浮点数会有很小的误差，直接向上取整会出现多裁剪了一张图的情况
     if (fabs(cuts - round(cuts)) < 0.0001) {
