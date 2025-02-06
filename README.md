@@ -11,26 +11,43 @@
 ## 优化核函数
 ### 核函数设计
 ```C++
-__global__ void slice_kernel(
-  const uchar3* image,       // 输入图像
-  uchar3* outs,              // 输出切片
-  const int width,           // 原图宽度
-  /* 其他参数... */
-){
-    // 计算切片索引和坐标
+static __global__ void slice_kernel(
+  const uchar3* __restrict__ image,
+  uchar3* __restrict__ outs,
+  const int width,
+  const int height,
+  const int slice_width,
+  const int slice_height,
+  const int slice_num_h,
+  const int slice_num_v,
+  const int* __restrict__ slice_start_point)
+{
     const int slice_idx = blockIdx.z;
+    const int start_x = slice_start_point[slice_idx * 2];
+    const int start_y = slice_start_point[slice_idx * 2 + 1];
+
+    // 当前像素在切片内的相对位置
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    // 边界检查
-    if(x >= slice_width || y >= slice_height) return;
-    
-    // 坐标映射与数据拷贝
+    if(x >= slice_width| y >= slice_height) 
+    {
+        return;
+    }
+        
+    // 原图坐标
     const int dx = start_x + x;
     const int dy = start_y + y;
-    if(dx < width && dy < height){
-        outs[dst_index] = image[src_index];
-    }
+
+    if(dx >= width || dy >= height) 
+        return;
+
+    // 读取像素
+    const int src_index = dy * width + dx;
+    const uchar3 pixel = image[src_index];
+
+    // 写入切片
+    const int dst_index = slice_idx * slice_width * slice_height + y * slice_width + x;
+    outs[dst_index] = pixel;
 }
 ```
 ### 说明

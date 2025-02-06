@@ -14,7 +14,7 @@ static __global__ void slice_kernel(
   const int* __restrict__ slice_start_point)
 {
     const int slice_idx = blockIdx.z;
-    // printf("%d\n", slice_idx);
+
     const int start_x = slice_start_point[slice_idx * 2];
     const int start_y = slice_start_point[slice_idx * 2 + 1];
 
@@ -23,7 +23,6 @@ static __global__ void slice_kernel(
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
     if(x >= slice_width| y >= slice_height) 
     {
-        // printf("i, j : %d,%d\t x, y : %d, %d \t w, h : %d, %d\n", i, j, x, y, sdx_end - sdx_start, sdy_end - sdy_start);
         return;
     }
         
