@@ -11,29 +11,25 @@ static __global__ void slice_kernel(
   const int slice_height,
   const int slice_num_h,
   const int slice_num_v,
-  const int* __restrict__ slice_range)
+  const int* __restrict__ slice_start_point)
 {
-    const int* slice_range_h = slice_range;
-    const int* slice_range_v = slice_range + slice_num_h * 2;
-
     const int slice_idx = blockIdx.z;
     // printf("%d\n", slice_idx);
-    const int i = slice_idx / slice_num_v;
-    const int j = slice_idx % slice_num_v;
-
-    const int sdx_start = slice_range_h[i*2];
-    const int sdx_end = slice_range_h[i*2+1];
-    const int sdy_start = slice_range_v[j*2];
-    const int sdy_end = slice_range_v[j*2+1];
+    const int start_x = slice_start_point[slice_idx * 2];
+    const int start_y = slice_start_point[slice_idx * 2 + 1];
 
     // 当前像素在切片内的相对位置
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
-    if(x >= (sdx_end - sdx_start) || y >= (sdy_end - sdy_start)) 
+    if(x >= slice_width| y >= slice_height) 
+    {
+        // printf("i, j : %d,%d\t x, y : %d, %d \t w, h : %d, %d\n", i, j, x, y, sdx_end - sdx_start, sdy_end - sdy_start);
         return;
+    }
+        
     // 原图坐标
-    const int dx = sdx_start + x;
-    const int dy = sdy_start + y;
+    const int dx = start_x + x;
+    const int dy = start_y + y;
 
     if(dx >= width || dy >= height) 
         return;
@@ -49,7 +45,7 @@ static __global__ void slice_kernel(
 
 static void slice_plane(const uint8_t* image,
     uint8_t* outs,
-    int* slice_range,
+    int* slice_start_point,
     const int width,
     const int height,
     const int slice_width,
@@ -72,7 +68,7 @@ static void slice_plane(const uint8_t* image,
         width, height, 
         slice_width, slice_height, 
         slice_num_h, slice_num_v, 
-        slice_range
+        slice_start_point
     );
 }
 
@@ -255,9 +251,8 @@ std::vector<SlicedImageData> SliceImage::slice(
     uint8_t* input_device = input_image_.gpu();
     uint8_t* output_device = output_images_.gpu();
 
-    const int total_slice_range_size = 2 * (slice_num_h_ + slice_num_v_);
-    slice_range_.cpu(total_slice_range_size * sizeof(int));
-    int* slice_range_ptr = slice_range_.cpu();
+    slice_start_point_.cpu(slice_num * 2);
+    int* slice_start_point_ptr = slice_start_point_.cpu();
     
     for (int i = 0; i < slice_num_h_; i++)
     {
@@ -266,16 +261,16 @@ std::vector<SlicedImageData> SliceImage::slice(
         {
             int y = std::max(0, j * (slice_height - overlap_height_pixel));
             int index = i * slice_num_v_ + j;
-            slice_range_ptr[index*2]   = x;
-            slice_range_ptr[index*2+1] = y;
-            printf("x,y : %d, %d\n", x,y);
-        }
+            slice_start_point_ptr[index*2]   = x;
+            slice_start_point_ptr[index*2+1] = y;
+            printf("i, j:%d,%d \t x,y : %d, %d\n", i, j, slice_start_point_ptr[index*2], slice_start_point_ptr[index*2+1]);
+        } 
     }
-    slice_range_.gpu(total_slice_range_size);
-    checkRuntime(cudaMemcpyAsync(slice_range_.gpu(), slice_range_.cpu(), total_slice_range_size * sizeof(int), cudaMemcpyHostToDevice, stream_));
+    slice_start_point_.gpu(slice_num * 2);
+    checkRuntime(cudaMemcpyAsync(slice_start_point_.gpu(), slice_start_point_.cpu(), slice_num * 2 * sizeof(int), cudaMemcpyHostToDevice, stream_));
     checkRuntime(cudaStreamSynchronize(stream_));
     slice_plane(
-        input_device, output_device, slice_range_.gpu(),
+        input_device, output_device, slice_start_point_.gpu(),
         width, height, 
         slice_width, slice_height, 
         slice_num_h_, slice_num_v_,
@@ -296,10 +291,10 @@ std::vector<SlicedImageData> SliceImage::slice(
         for (int j = 0; j < slice_num_v_; j++)
         {
             int index = i * slice_num_v_ + j;
-            slice_position_[index*2]   = slice_range_ptr[index*2];
-            slice_position_[index*2+1] = slice_range_ptr[index*2+1];
-            slicedData[index].x = slice_range_ptr[index*2];
-            slicedData[index].y = slice_range_ptr[index*2+1];
+            slice_position_[index*2]   = slice_start_point_ptr[index*2];
+            slice_position_[index*2+1] = slice_start_point_ptr[index*2+1];
+            slicedData[index].x = slice_start_point_ptr[index*2];
+            slicedData[index].y = slice_start_point_ptr[index*2+1];
             slicedData[index].w = slice_width;
             slicedData[index].h = slice_height;
             uint8_t* output_img_data = slicedData[index].image.ptr<uint8_t>();
