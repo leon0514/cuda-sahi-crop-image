@@ -106,6 +106,8 @@ void test()
             // 保存带框的图片
             std::string image_name = std::to_string(i) + std::to_string(j) + ".jpg";
             cv::imwrite(image_name, image);
+            std::string png_image_name = std::to_string(i) + std::to_string(j) + ".png";
+            cv::imwrite(png_image_name, results[index].image);
         }
         
     }

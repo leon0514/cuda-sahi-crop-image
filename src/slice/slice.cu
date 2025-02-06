@@ -17,6 +17,7 @@ static __global__ void slice_kernel(
     const int* slice_range_v = slice_range + slice_num_h * 2;
 
     const int slice_idx = blockIdx.z;
+    // printf("%d\n", slice_idx);
     const int i = slice_idx / slice_num_v;
     const int j = slice_idx % slice_num_v;
 
@@ -28,10 +29,8 @@ static __global__ void slice_kernel(
     // 当前像素在切片内的相对位置
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
-    
     if(x >= (sdx_end - sdx_start) || y >= (sdy_end - sdy_start)) 
         return;
-
     // 原图坐标
     const int dx = sdx_start + x;
     const int dy = sdy_start + y;
@@ -269,10 +268,11 @@ std::vector<SlicedImageData> SliceImage::slice(
             int index = i * slice_num_v_ + j;
             slice_range_ptr[index*2]   = x;
             slice_range_ptr[index*2+1] = y;
+            printf("x,y : %d, %d\n", x,y);
         }
     }
     slice_range_.gpu(total_slice_range_size);
-    checkRuntime(cudaMemcpyAsync(slice_range_.gpu(), slice_range_.cpu(), total_slice_range_size, cudaMemcpyHostToDevice, stream_));
+    checkRuntime(cudaMemcpyAsync(slice_range_.gpu(), slice_range_.cpu(), total_slice_range_size * sizeof(int), cudaMemcpyHostToDevice, stream_));
     checkRuntime(cudaStreamSynchronize(stream_));
     slice_plane(
         input_device, output_device, slice_range_.gpu(),
