@@ -17,8 +17,8 @@ static __global__ void slice_kernel(
     const int* slice_range_v = slice_range + slice_num_h * 2;
 
     const int slice_idx = blockIdx.z;
-    const int i = slice_idx / slice_num_h;
-    const int j = slice_idx % slice_num_h;
+    const int i = slice_idx / slice_num_v;
+    const int j = slice_idx % slice_num_v;
 
     const int sdx_start = slice_range_h[i*2];
     const int sdx_end = slice_range_h[i*2+1];
