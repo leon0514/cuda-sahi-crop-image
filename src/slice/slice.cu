@@ -3,104 +3,78 @@
 #include <cmath>
 
 static __global__ void slice_kernel(
-  const uint8_t*  image,
-  uint8_t*  outs,
+  const uchar3* __restrict__ image,
+  uchar3* __restrict__ outs,
   const int width,
   const int height,
   const int slice_width,
   const int slice_height,
   const int slice_num_h,
   const int slice_num_v,
-  const int overlap_width_pixel,
-  const int overlap_height_pixel)
+  const int* __restrict__ slice_range)
 {
-    const int out_size = 3 * slice_width * slice_height;
-    int dx = blockDim.x * blockIdx.x + threadIdx.x;
-    int dy = blockDim.y * blockIdx.y + threadIdx.y;
-    if (dx >= width || dy >= height || dx < 0 || dy < 0)
-    {
+    const int* slice_range_h = slice_range;
+    const int* slice_range_v = slice_range + slice_num_h * 2;
+
+    const int slice_idx = blockIdx.z;
+    const int i = slice_idx / slice_num_h;
+    const int j = slice_idx % slice_num_h;
+
+    const int sdx_start = slice_range_h[i*2];
+    const int sdx_end = slice_range_h[i*2+1];
+    const int sdy_start = slice_range_v[j*2];
+    const int sdy_end = slice_range_v[j*2+1];
+
+    // 当前像素在切片内的相对位置
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if(x >= (sdx_end - sdx_start) || y >= (sdy_end - sdy_start)) 
         return;
-    }
-    int offset = dy * width + dx;
-    uint8_t b = image[3 * offset + 0];
-    uint8_t g = image[3 * offset + 1];
-    uint8_t r = image[3 * offset + 2];
 
+    // 原图坐标
+    const int dx = sdx_start + x;
+    const int dy = sdy_start + y;
 
-    // 定义外部的动态大小享内存，存储切片范围
-    extern __shared__ int slice_range[];
+    if(dx >= width || dy >= height) 
+        return;
 
-    int* slice_range_h = slice_range;
-    int* slice_range_v = slice_range + slice_num_h * 2;
+    // 读取像素
+    const int src_index = dy * width + dx;
+    const uchar3 pixel = image[src_index];
 
-    // 计算切片的起始和结束位置，并存储在共享内存中
-    if (threadIdx.x < slice_num_h) 
-    {
-        // 这里计算start的时候必须分两行，先计算start，再取0和start的最大值
-        int start = threadIdx.x * (slice_width - overlap_width_pixel);
-        start = max(start, 0);
-        int end = start + slice_width;
-        slice_range_h[threadIdx.x * 2] = start;
-        slice_range_h[threadIdx.x * 2 + 1] = end;
-        
-    }
-
-    if (threadIdx.y < slice_num_v) {
-        int start = threadIdx.y * (slice_height - overlap_height_pixel);
-        start = max(start, 0);
-        int end = start + slice_height;
-        slice_range_v[threadIdx.y * 2] = start;
-        slice_range_v[threadIdx.y * 2 + 1] = end;
-        
-    }
-    __syncthreads();
-
-    for (int i = 0; i < slice_num_h; i++)
-    {
-        int sdx_start = slice_range_h[i * 2];
-        int sdx_end   = slice_range_h[i * 2 + 1];
-
-        for (int j = 0; j < slice_num_v; j++)
-        {
-            int sdy_start = slice_range_v[j * 2];
-            int sdy_end = slice_range_v[j * 2 + 1];   
-            if (dx >= sdx_start && dx < sdx_end && dy >= sdy_start && dy < sdy_end)
-            {
-                int image_id = i * slice_num_v + j;
-                int sdx = dx - sdx_start;
-                int sdy = dy - sdy_start;
-                int soffset = sdy * slice_width + sdx;
-                outs[image_id * out_size + 3 * soffset + 0] = b;
-                outs[image_id * out_size + 3 * soffset + 1] = g;
-                outs[image_id * out_size + 3 * soffset + 2] = r;
-            }
-        }
-    }
+    // 写入切片
+    const int dst_index = slice_idx * slice_width * slice_height + y * slice_width + x;
+    outs[dst_index] = pixel;
 }
 
 static void slice_plane(const uint8_t* image,
-    uint8_t*  outs,
+    uint8_t* outs,
+    int* slice_range,
     const int width,
     const int height,
     const int slice_width,
     const int slice_height,
     const int slice_num_h,
     const int slice_num_v,
-    const int overlap_width_pixel,
-    const int overlap_height_pixel,
     void* stream=nullptr)
 {
+    int slice_total = slice_num_h * slice_num_v;
     cudaStream_t stream_ = (cudaStream_t)stream;
     dim3 block(32, 32);
-    dim3 grid((width + 31) / 32, (height + 31) / 32);
-
-    int shared_memory_size = sizeof(int) * (slice_num_h + slice_num_v) * 2;
-
-    slice_kernel<<<grid, block, shared_memory_size, stream_>>>(image, outs, 
-                                    width, height, 
-                                    slice_width, slice_height, 
-                                    slice_num_h, slice_num_v, 
-                                    overlap_width_pixel, overlap_height_pixel);
+    dim3 grid(
+        (slice_width + block.x - 1) / block.x,
+        (slice_height + block.y - 1) / block.y,
+        slice_total
+    );
+    slice_kernel<<<grid, block, 0, stream_>>>(
+        reinterpret_cast<const uchar3*>(image),
+        reinterpret_cast<uchar3*>(outs),
+        width, height, 
+        slice_width, slice_height, 
+        slice_num_h, slice_num_v, 
+        slice_range
+    );
 }
 
 
@@ -239,15 +213,26 @@ std::vector<SlicedImageData> SliceImage::slice(
         const float overlap_height_ratio,
         void* stream)
 {
+    slice_width_  = slice_width;
+    slice_height_ = slice_height;
     cudaStream_t stream_ = (cudaStream_t)stream;
 
     int width = image.width;
     int height = image.height;
 
-    int slice_num_h = calculateNumCuts(width, slice_width, overlap_width_ratio);
-    int slice_num_v = calculateNumCuts(height, slice_height, overlap_height_ratio);
-    std::cout << "slice_num_h : " << slice_num_h << " slice_num_v : " << slice_num_v << std::endl;
-    int slice_num            = slice_num_h * slice_num_v;
+    slice_num_h_ = calculateNumCuts(width, slice_width, overlap_width_ratio);
+    slice_num_v_ = calculateNumCuts(height, slice_height, overlap_height_ratio);
+    printf("------------------------------------------------------\n"
+            "CUDA SAHI CROP IMAGE ✂️\n"
+            "Slice width                : %d\n"
+            "Slice Height               : %d\n"
+            "Overlap width  ratio       : %f\n"
+            "Overlap height ratio       : %f\n"
+            "Number of horizontal cuts  : %d\n"
+            "Number of vertical cuts    : %d\n"
+            "------------------------------------------------------\n", 
+            slice_width, slice_height, overlap_width_ratio, overlap_height_ratio, slice_num_h_, slice_num_v_);
+    int slice_num            = slice_num_h_ * slice_num_v_;
     int overlap_width_pixel  = slice_width  * overlap_width_ratio;
     int overlap_height_pixel = slice_height * overlap_height_ratio;
     // int slice_width   = (width - overlap_pixel) / slice_num_h + overlap_pixel;
@@ -262,17 +247,38 @@ std::vector<SlicedImageData> SliceImage::slice(
     output_images_.gpu(slice_num * output_img_size);
     // output_images_.cpu(slice_num * output_img_size);
 
+    checkRuntime(cudaMemsetAsync(output_images_.gpu(), 114, output_images_.gpu_bytes(), stream_));
+    slice_position_.resize(slice_num * 2);
+
     checkRuntime(cudaMemcpyAsync(input_image_.gpu(), image.bgrptr, size_image, cudaMemcpyHostToDevice, stream_));
-    // checkRuntime(cudaStreamSynchronize(stream_));
+    checkRuntime(cudaStreamSynchronize(stream_));
+
     uint8_t* input_device = input_image_.gpu();
     uint8_t* output_device = output_images_.gpu();
 
+    const int total_slice_range_size = 2 * (slice_num_h_ + slice_num_v_);
+    slice_range_.cpu(total_slice_range_size * sizeof(int));
+    int* slice_range_ptr = slice_range_.cpu();
+    
+    for (int i = 0; i < slice_num_h_; i++)
+    {
+        int x = std::max(0, i * (slice_width - overlap_width_pixel));
+        for (int j = 0; j < slice_num_v_; j++)
+        {
+            int y = std::max(0, j * (slice_height - overlap_height_pixel));
+            int index = i * slice_num_v_ + j;
+            slice_range_ptr[index*2]   = x;
+            slice_range_ptr[index*2+1] = y;
+        }
+    }
+    slice_range_.gpu(total_slice_range_size);
+    checkRuntime(cudaMemcpyAsync(slice_range_.gpu(), slice_range_.cpu(), total_slice_range_size, cudaMemcpyHostToDevice, stream_));
+    checkRuntime(cudaStreamSynchronize(stream_));
     slice_plane(
-        input_device, output_device, 
+        input_device, output_device, slice_range_.gpu(),
         width, height, 
         slice_width, slice_height, 
-        slice_num_h, slice_num_v, 
-        overlap_width_pixel, overlap_height_pixel, 
+        slice_num_h_, slice_num_v_,
         stream);
 
     checkRuntime(cudaStreamSynchronize(stream_));
@@ -284,15 +290,16 @@ std::vector<SlicedImageData> SliceImage::slice(
         slicedData[i].y = 0.0f;
     }
 
-    for (int i = 0; i < slice_num_h; i++)
+    
+    for (int i = 0; i < slice_num_h_; i++)
     {
-        int x = std::max(0, i * (slice_width - overlap_width_pixel));
-        for (int j = 0; j < slice_num_v; j++)
+        for (int j = 0; j < slice_num_v_; j++)
         {
-            int y = std::max(0, j * (slice_height - overlap_height_pixel));
-            int index = i * slice_num_v + j;
-            slicedData[index].x = x;
-            slicedData[index].y = y;
+            int index = i * slice_num_v_ + j;
+            slice_position_[index*2]   = slice_range_ptr[index*2];
+            slice_position_[index*2+1] = slice_range_ptr[index*2+1];
+            slicedData[index].x = slice_range_ptr[index*2];
+            slicedData[index].y = slice_range_ptr[index*2+1];
             slicedData[index].w = slice_width;
             slicedData[index].h = slice_height;
             uint8_t* output_img_data = slicedData[index].image.ptr<uint8_t>();

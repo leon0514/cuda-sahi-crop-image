@@ -61,10 +61,16 @@ void test()
 
     cv::Mat image = cv::imread("wallhaven-l8vp7y.jpg");
 
-    auto results = instance.slice(tensor::cvimg(image), 640, 320, 0.1, 0.1);
+    int slice_width  = 640;
+    int slice_height = 640;
+    float slice_x_ratio = 0.4f;
+    float slice_y_ratio = 0.4f;
 
-    int slice_num_h = slice::calculateNumCuts(1920, 640, 0.1);
-    int slice_num_v = slice::calculateNumCuts(1080, 320, 0.1);
+
+    auto results = instance.slice(tensor::cvimg(image), slice_width, slice_height, slice_x_ratio, slice_y_ratio);
+
+    int slice_num_h = slice::calculateNumCuts(image.cols, slice_width, slice_x_ratio);
+    int slice_num_v = slice::calculateNumCuts(image.rows, slice_height, slice_y_ratio);
 
     for (int i = 0; i < slice_num_h; i++)
     {
@@ -94,10 +100,11 @@ void test()
 
             // 在矩形内部添加文本标记，帮助区分
             std::string label = "Slice " + std::to_string(i) + "," + std::to_string(j);
+            std::cout << label << std::endl;
             cv::putText(image, label, cv::Point(x, y - 10), cv::FONT_HERSHEY_SIMPLEX, 0.5, borderColor, 2);
 
             // 保存带框的图片
-            std::string image_name = std::to_string(j) + std::to_string(i) + ".jpg";
+            std::string image_name = std::to_string(i) + std::to_string(j) + ".jpg";
             cv::imwrite(image_name, image);
         }
         
@@ -107,5 +114,11 @@ void test()
 
 int main()
 {
-    test_auto();
+    // test_auto();
+    for (int i = 0; i < 1; i++)
+    {
+        // test_auto();
+        test();
+    }
+    
 }

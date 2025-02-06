@@ -23,6 +23,17 @@ class SliceImage{
 private:
     tensor::Memory<unsigned char> input_image_;
     tensor::Memory<unsigned char> output_images_;
+
+    tensor::Memory<int> slice_range_;
+
+    int slice_num_h_;
+    int slice_num_v_;
+
+    int slice_width_;
+    int slice_height_;
+
+    std::vector<int> slice_position_;
+
 public:
     std::vector<SlicedImageData> slice(
         const tensor::Image& image, 
