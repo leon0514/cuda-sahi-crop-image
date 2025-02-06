@@ -33,9 +33,9 @@ __global__ void slice_kernel(
     }
 }
 ```
-### 核函数特性
-- 三维网格布局：blockIdx.z 表示切片索引。消去了之前核函数中的for循环
-
+### 说明
+- 三维网格布局：blockIdx.z表示切片索引。消去了之前核函数中的for循环。
+- 优化坐标计算：只保留起始点坐标，代码更易读
 
 ### 展示效果
 ![效果](https://github.com/leon0514/cuda-sahi-crop-image/blob/main/workspace/test.gif)
