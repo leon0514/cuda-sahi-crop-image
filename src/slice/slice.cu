@@ -243,7 +243,6 @@ std::vector<SlicedImageData> SliceImage::slice(
     // output_images_.cpu(slice_num * output_img_size);
 
     checkRuntime(cudaMemsetAsync(output_images_.gpu(), 114, output_images_.gpu_bytes(), stream_));
-    slice_position_.resize(slice_num * 2);
 
     checkRuntime(cudaMemcpyAsync(input_image_.gpu(), image.bgrptr, size_image, cudaMemcpyHostToDevice, stream_));
     checkRuntime(cudaStreamSynchronize(stream_));
@@ -262,8 +261,7 @@ std::vector<SlicedImageData> SliceImage::slice(
             int y = std::max(0, j * (slice_height - overlap_height_pixel));
             int index = i * slice_num_v_ + j;
             slice_start_point_ptr[index*2]   = x;
-            slice_start_point_ptr[index*2+1] = y;
-            printf("i, j:%d,%d \t x,y : %d, %d\n", i, j, slice_start_point_ptr[index*2], slice_start_point_ptr[index*2+1]);
+            slice_start_point_ptr[index*2+1] = y;    
         } 
     }
     slice_start_point_.gpu(slice_num * 2);
@@ -291,8 +289,6 @@ std::vector<SlicedImageData> SliceImage::slice(
         for (int j = 0; j < slice_num_v_; j++)
         {
             int index = i * slice_num_v_ + j;
-            slice_position_[index*2]   = slice_start_point_ptr[index*2];
-            slice_position_[index*2+1] = slice_start_point_ptr[index*2+1];
             slicedData[index].x = slice_start_point_ptr[index*2];
             slicedData[index].y = slice_start_point_ptr[index*2+1];
             slicedData[index].w = slice_width;
