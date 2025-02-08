@@ -254,15 +254,16 @@ std::vector<SlicedImageData> SliceImage::slice(
     
     for (int i = 0; i < slice_num_h_; i++)
     {
-        int x = std::max(0, i * (slice_width - overlap_width_pixel));
+        int x = std::min(width - slice_width, std::max(0, i * (slice_width - overlap_width_pixel)));
         for (int j = 0; j < slice_num_v_; j++)
         {
-            int y = std::max(0, j * (slice_height - overlap_height_pixel));
-            int index = i * slice_num_v_ + j;
-            slice_start_point_ptr[index*2]   = x;
-            slice_start_point_ptr[index*2+1] = y;    
-        } 
+            int y = std::min(height - slice_height, std::max(0, j * (slice_height - overlap_height_pixel)));
+            int index = (i * slice_num_v_ + j) * 2;
+            slice_start_point_ptr[index] = x;
+            slice_start_point_ptr[index + 1] = y;
+        }
     }
+
     slice_start_point_.gpu(slice_num * 2);
     checkRuntime(cudaMemcpyAsync(slice_start_point_.gpu(), slice_start_point_.cpu(), slice_num * 2 * sizeof(int), cudaMemcpyHostToDevice, stream_));
     checkRuntime(cudaStreamSynchronize(stream_));
