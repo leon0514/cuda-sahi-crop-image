@@ -21,7 +21,7 @@ static __global__ void slice_kernel(
     // 当前像素在切片内的相对位置
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
-    if(x >= slice_width| y >= slice_height) 
+    if(x >= slice_width || y >= slice_height) 
     {
         return;
     }
